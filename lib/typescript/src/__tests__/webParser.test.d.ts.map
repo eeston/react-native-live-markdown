@@ -1,0 +1,1 @@
+{"version":3,"file":"webParser.test.d.ts","sourceRoot":"","sources":["../../../../src/__tests__/webParser.test.tsx"],"names":[],"mappings":"AAmCA,OAAO,QAAQ,QAAQ,CAAC;IACtB,UAAU,kBAAkB;QAC1B,gBAAgB,CAAC,YAAY,EAAE,MAAM,GAAG,IAAI,CAAC;KAC9C;IACD,UAAU,QAAQ,CAAC,CAAC;QAClB,gBAAgB,CAAC,YAAY,EAAE,MAAM,GAAG,CAAC,CAAC;KAC3C;CACF"}

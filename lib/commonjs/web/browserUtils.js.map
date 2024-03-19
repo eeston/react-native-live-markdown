@@ -1,0 +1,1 @@
+{"version":3,"names":["isFirefox","exports","navigator","userAgent","toLowerCase","includes","isChromium","window"],"sourceRoot":"../../../src","sources":["web/browserUtils.ts"],"mappings":";;;;;;AAAA,MAAMA,SAAS,GAAAC,OAAA,CAAAD,SAAA,GAAGE,SAAS,CAACC,SAAS,CAACC,WAAW,CAAC,CAAC,CAACC,QAAQ,CAAC,SAAS,CAAC;AACvE,MAAMC,UAAU,GAAAL,OAAA,CAAAK,UAAA,GAAG,QAAQ,IAAIC,MAAM"}
