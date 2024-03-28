@@ -1,6 +1,6 @@
 import type * as StyleUtilsTypes from '../styleUtils';
 type PartialMarkdownStyle = StyleUtilsTypes.PartialMarkdownStyle;
-type MarkdownType = 'bold' | 'italic' | 'strikethrough' | 'link' | 'code' | 'pre' | 'blockquote' | 'h1' | 'syntax' | 'mention-here' | 'mention-user';
+type MarkdownType = 'bold' | 'italic' | 'strikethrough' | 'emoji' | 'link' | 'code' | 'pre' | 'blockquote' | 'h1' | 'syntax' | 'mention-here' | 'mention-user';
 type MarkdownRange = {
     type: MarkdownType;
     start: number;

@@ -6,6 +6,9 @@ interface MarkdownStyle {
     syntax: {
         color: ColorValue;
     };
+    emoji: {
+        fontSize: Float;
+    };
     link: {
         color: ColorValue;
     };
