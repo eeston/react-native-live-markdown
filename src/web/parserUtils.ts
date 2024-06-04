@@ -4,7 +4,7 @@ import * as BrowserUtils from './browserUtils';
 
 type PartialMarkdownStyle = StyleUtilsTypes.PartialMarkdownStyle;
 
-type MarkdownType = 'bold' | 'italic' | 'strikethrough' | 'emoji' | 'link' | 'code' | 'pre' | 'blockquote' | 'h1' | 'syntax' | 'mention-here' | 'mention-user' | 'mention-report';
+type MarkdownType = 'bold' | 'italic' | 'strikethrough' | 'emoji' | 'link' | 'code' | 'pre' | 'blockquote' | 'h1' | 'syntax' | 'mention-here' | 'mention-user' | 'mention-report' | 'text';
 
 type MarkdownRange = {
   type: MarkdownType;
@@ -13,9 +13,17 @@ type MarkdownRange = {
   depth?: number;
 };
 
-type NestedNode = {
-  node: HTMLElement;
-  endIndex: number;
+type TreeItem = {
+  element: HTMLElement | Text;
+  parent: TreeItem | null;
+  children: TreeItem[];
+} & MarkdownRange;
+
+type Paragraph = {
+  text: string;
+  start: number;
+  length: number;
+  markdownRanges: MarkdownRange[];
 };
 
 function addStyling(targetElement: HTMLElement, type: MarkdownType, markdownStyle: PartialMarkdownStyle) {
@@ -78,13 +86,6 @@ function addStyling(targetElement: HTMLElement, type: MarkdownType, markdownStyl
   }
 }
 
-function addSubstringAsTextNode(root: HTMLElement, text: string, startIndex: number, endIndex: number) {
-  const substring = text.substring(startIndex, endIndex);
-  if (substring.length > 0) {
-    root.appendChild(document.createTextNode(substring));
-  }
-}
-
 function ungroupRanges(ranges: MarkdownRange[]): MarkdownRange[] {
   const ungroupedRanges: MarkdownRange[] = [];
   ranges.forEach((range) => {
@@ -99,71 +100,139 @@ function ungroupRanges(ranges: MarkdownRange[]): MarkdownRange[] {
   return ungroupedRanges;
 }
 
-function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownStyle: PartialMarkdownStyle = {}, disableInlineStyles = false): HTMLElement {
-  const root: HTMLElement = document.createElement('span');
-  root.className = 'root';
+function createParagraph(text: string | null = null) {
+  const p = document.createElement('p');
+  Object.assign(p.style, {
+    margin: '0',
+    padding: '0',
+    display: 'block',
+  });
+
+  if (text === '') {
+    p.appendChild(document.createElement('br'));
+  } else if (text) {
+    p.appendChild(document.createTextNode(text));
+  }
+
+  return p;
+}
+
+function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownStyle: PartialMarkdownStyle = {}, disableInlineStyles = false) {
+  const root: HTMLElement = document.createElement('div');
+  const tree: TreeItem[] = [];
+  let currentTreeItem: TreeItem | null = null;
   const textLength = text.length;
+
+  function addItemToTree(element: HTMLElement | Text, type: MarkdownType, start: number, length: number | null = null) {
+    const contentLength = length || element.textContent!.length;
+    const item: TreeItem = {
+      element,
+      parent: currentTreeItem,
+      children: [],
+      start,
+      length: contentLength,
+      type,
+    };
+
+    if (currentTreeItem) {
+      currentTreeItem.children.push(item);
+      currentTreeItem.element.appendChild(element);
+    } else {
+      tree.push(item);
+      root.appendChild(element);
+    }
+
+    return item;
+  }
+
+  let lineStartIndex = 0;
+  const lines: Paragraph[] = text.split('\n').map((line) => {
+    const lineObject: Paragraph = {
+      text: line,
+      start: lineStartIndex,
+      length: line.length,
+      markdownRanges: [],
+    };
+
+    lineStartIndex += line.length + 1; // Adding 1 for the newline character
+    return lineObject;
+  });
+
   if (ranges.length === 0) {
-    addSubstringAsTextNode(root, text, 0, textLength);
+    lines.forEach((line) => {
+      addItemToTree(createParagraph(line.text), 'text', line.start, line.length);
+    });
     return root;
   }
 
   const stack = ungroupRanges(ranges);
-  const nestedStack: NestedNode[] = [{node: root, endIndex: textLength}];
-  let lastRangeEndIndex = 0;
-  while (stack.length > 0) {
-    const range = stack.shift();
-    if (!range) {
-      break;
-    }
-    let currentRoot = nestedStack[nestedStack.length - 1];
-    if (!currentRoot) {
-      break;
-    }
 
-    const endOfCurrentRange = range.start + range.length;
-    const nextRangeStartIndex = stack.length > 0 && !!stack[0] ? stack[0].start || 0 : textLength;
+  // group ranges by line
+  let lineIndex = 0;
+  stack.forEach((range) => {
+    const {start} = range;
 
-    addSubstringAsTextNode(currentRoot.node, text, lastRangeEndIndex, range.start); // add text with newlines before current range
-
-    const span = document.createElement('span');
-    if (disableInlineStyles) {
-      span.className = range.type;
-    } else {
-      addStyling(span, range.type, markdownStyle);
+    let currentLine = lines[lineIndex];
+    while (currentLine && lineIndex < lines.length && start > currentLine.start + currentLine.length) {
+      lineIndex += 1;
+      currentLine = lines[lineIndex];
     }
 
-    if (stack.length > 0 && nextRangeStartIndex < endOfCurrentRange && range.type !== 'syntax') {
-      // tag nesting
-      currentRoot.node.appendChild(span);
-      nestedStack.push({node: span, endIndex: endOfCurrentRange});
-      lastRangeEndIndex = range.start;
-    } else {
-      addSubstringAsTextNode(span, text, range.start, endOfCurrentRange);
-      currentRoot.node.appendChild(span);
-      lastRangeEndIndex = endOfCurrentRange;
+    if (currentLine) {
+      currentLine.markdownRanges.push({
+        ...range,
+        start: start - currentLine.start,
+      });
+    }
+  });
 
-      // end of tag nesting
-      while (nestedStack.length - 1 > 0 && nextRangeStartIndex >= currentRoot.endIndex) {
-        addSubstringAsTextNode(currentRoot.node, text, lastRangeEndIndex, currentRoot.endIndex);
-        const prevRoot = nestedStack.pop();
-        if (!prevRoot) {
-          break;
+  lines.forEach((line) => {
+    currentTreeItem = null;
+    currentTreeItem = addItemToTree(createParagraph(line.markdownRanges.length > 0 ? null : line.text), 'text', line.start, line.length);
+
+    const lineStack = line.markdownRanges;
+    let lastRangeEndIndex = 0;
+    while (lineStack.length > 0) {
+      const range = lineStack.shift();
+      if (!range) {
+        break;
+      }
+      const endOfCurrentRange = range.start + range.length;
+      const nextRangeStartIndex = lineStack.length > 0 && !!lineStack[0] ? lineStack[0].start || 0 : textLength;
+
+      const textBeforeRange = line.text.substring(lastRangeEndIndex, range.start);
+      if (textBeforeRange) {
+        addItemToTree(document.createTextNode(textBeforeRange), 'text', lastRangeEndIndex);
+      }
+
+      const span = document.createElement('span');
+      if (disableInlineStyles) {
+        span.className = range.type;
+      } else {
+        addStyling(span, range.type, markdownStyle);
+      }
+
+      if (stack.length > 0 && nextRangeStartIndex < endOfCurrentRange && range.type !== 'syntax') {
+        // tag nesting
+        currentTreeItem = addItemToTree(span, range.type, range.start, range.length);
+        lastRangeEndIndex = range.start;
+      } else {
+        span.innerText = line.text.substring(range.start, endOfCurrentRange);
+        addItemToTree(span, range.type, range.start, range.length);
+        lastRangeEndIndex = endOfCurrentRange;
+
+        while (currentTreeItem && nextRangeStartIndex >= currentTreeItem.start + currentTreeItem.length) {
+          const textAfterRange = line.text.substring(lastRangeEndIndex, currentTreeItem.start + currentTreeItem.length);
+          if (textAfterRange) {
+            addItemToTree(document.createTextNode(textAfterRange), 'text', lastRangeEndIndex);
+          }
+          lastRangeEndIndex = currentTreeItem.start + currentTreeItem.length;
+          currentTreeItem = currentTreeItem.parent;
         }
-        lastRangeEndIndex = prevRoot.endIndex;
-        currentRoot = nestedStack[nestedStack.length - 1] || currentRoot;
       }
     }
-  }
+  });
 
-  if (nestedStack.length > 1) {
-    const lastNestedNode = nestedStack[nestedStack.length - 1];
-    if (lastNestedNode) {
-      root.appendChild(lastNestedNode.node);
-    }
-  }
-
-  addSubstringAsTextNode(root, text, lastRangeEndIndex, textLength);
   return root;
 }
 
@@ -189,53 +258,31 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
     cursorPosition = selection ? selection.end : null;
   }
   const ranges = global.parseExpensiMarkToRanges(text);
-
-  console.log(text.replaceAll('\n', '\\n'));
-
   const markdownRanges: MarkdownRange[] = ranges as MarkdownRange[];
-  const rootSpan = targetElement.firstChild as HTMLElement | null;
 
-  // if (!text || targetElement.innerHTML === '<br>' || (rootSpan && rootSpan.innerHTML === '\n')) {
-  targetElement.innerHTML = '';
-  targetElement.innerText = '';
-  // }
+  if (!text || targetElement.innerHTML === '<br>' || (targetElement && targetElement.innerHTML === '\n')) {
+    targetElement.innerHTML = '';
+    targetElement.innerText = '';
+  }
 
-  // // We don't want to parse text with single '\n', because contentEditable represents it as invisible <br />
-  // if (text) {
-  //   const dom = parseRangesToHTMLNodes(text, markdownRanges, markdownStyle);
+  // We don't want to parse text with single '\n', because contentEditable represents it as invisible <br />
+  if (text) {
+    const dom = parseRangesToHTMLNodes(text, markdownRanges, markdownStyle);
 
-  //   if (!rootSpan || rootSpan.innerHTML !== dom.innerHTML) {
-  //     targetElement.innerHTML = '';
-  //     targetElement.innerText = '';
-  //     target.appendChild(dom);
+    if (targetElement.innerHTML !== dom.innerHTML) {
+      targetElement.innerHTML = '';
+      targetElement.innerText = '';
+      targetElement.innerHTML = dom.innerHTML || '';
 
-  //     if (BrowserUtils.isChromium) {
-  //       moveCursor(isFocused, alwaysMoveCursorToTheEnd, cursorPosition, target);
-  //     }
-  //   }
-
-  //   if (!BrowserUtils.isChromium) {
-  //     moveCursor(isFocused, alwaysMoveCursorToTheEnd, cursorPosition, target);
-  //   }
-  // }
-
-  const lines = text.split('\n');
-  lines.forEach((line, index) => {
-    const p = document.createElement('p');
-    Object.assign(p.style, {
-      margin: '0',
-      padding: '0',
-      display: 'block',
-    });
-
-    if (line === '') {
-      p.appendChild(document.createElement('br'));
-    } else {
-      p.appendChild(document.createTextNode(line));
+      if (BrowserUtils.isChromium) {
+        moveCursor(isFocused, alwaysMoveCursorToTheEnd, cursorPosition, target);
+      }
     }
 
-    targetElement.appendChild(p);
-  });
+    if (!BrowserUtils.isChromium) {
+      moveCursor(isFocused, alwaysMoveCursorToTheEnd, cursorPosition, target);
+    }
+  }
 
   moveCursor(isFocused, alwaysMoveCursorToTheEnd, cursorPosition, target);
 
