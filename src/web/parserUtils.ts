@@ -147,12 +147,7 @@ function addItemToTree(
   return item;
 }
 
-function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownStyle: PartialMarkdownStyle = {}, disableInlineStyles = false) {
-  const root: HTMLElement = document.createElement('div');
-  const tree: TreeItem[] = [];
-  let parentTreeItem: TreeItem | null = null;
-  const textLength = text.length;
-
+function splitTextIntoLines(text: string): Paragraph[] {
   let lineStartIndex = 0;
   const lines: Paragraph[] = text.split('\n').map((line) => {
     const lineObject: Paragraph = {
@@ -165,18 +160,37 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
     return lineObject;
   });
 
-  if (ranges.length === 0) {
-    lines.forEach((line) => {
-      addItemToTree(tree, root, createParagraph(line.text), 'text', parentTreeItem, line.start, line.length);
-    });
-    return root;
+  return lines;
+}
+
+function mergeLinesWithMultilineTags(lines: Paragraph[]) {
+  let multiLineRange: MarkdownRange | null = null;
+  let lineWithMultilineTag: Paragraph | null = null;
+  let i = 0;
+  while (i < lines.length) {
+    const currentLine = lines[i];
+    if (!currentLine) {
+      break;
+    }
+
+    // start merging if line contains range that ends in a different line
+    if (lineWithMultilineTag && multiLineRange && currentLine.start <= lineWithMultilineTag.start + multiLineRange.start + multiLineRange.length) {
+      lineWithMultilineTag.text += `\n${currentLine.text}`;
+      const len = lineWithMultilineTag.length + 1;
+      lineWithMultilineTag.markdownRanges.push(...currentLine.markdownRanges.map((range) => ({...range, start: len + range.start})));
+      lineWithMultilineTag.length += currentLine.length + 1;
+      lines.splice(i, 1);
+    } else {
+      multiLineRange = currentLine.markdownRanges.find((range) => range.start + range.length > currentLine.length) || null;
+      lineWithMultilineTag = multiLineRange ? currentLine : null;
+      i += 1;
+    }
   }
+}
 
-  const stack = ungroupRanges(ranges);
-
-  // group ranges by line
+function groupMarkdownRangesByLine(lines: Paragraph[], ranges: MarkdownRange[]) {
   let lineIndex = 0;
-  stack.forEach((range) => {
+  ranges.forEach((range) => {
     const {start} = range;
 
     let currentLine = lines[lineIndex];
@@ -192,6 +206,26 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
       });
     }
   });
+}
+
+function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownStyle: PartialMarkdownStyle = {}, disableInlineStyles = false) {
+  const root: HTMLElement = document.createElement('div');
+  const tree: TreeItem[] = [];
+  let parentTreeItem: TreeItem | null = null;
+  const textLength = text.length;
+  const lines = splitTextIntoLines(text);
+
+  if (ranges.length === 0) {
+    lines.forEach((line) => {
+      addItemToTree(tree, root, createParagraph(line.text), 'text', parentTreeItem, line.start, line.length);
+    });
+    return root;
+  }
+
+  const markdownRanges = ungroupRanges(ranges);
+
+  groupMarkdownRangesByLine(lines, markdownRanges);
+  mergeLinesWithMultilineTags(lines);
 
   while (lines.length > 0) {
     const line = lines.shift();
@@ -202,15 +236,16 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
     parentTreeItem = null;
     parentTreeItem = addItemToTree(tree, root, createParagraph(line.markdownRanges.length > 0 ? null : line.text), 'text', parentTreeItem, line.start, line.length);
 
-    const lineStack = line.markdownRanges;
+    const lineMarkdownRanges = line.markdownRanges;
     let lastRangeEndIndex = 0;
-    while (lineStack.length > 0) {
-      const range = lineStack.shift();
+    while (lineMarkdownRanges.length > 0) {
+      const range = lineMarkdownRanges.shift();
       if (!range) {
         break;
       }
+
       const endOfCurrentRange = range.start + range.length;
-      const nextRangeStartIndex = lineStack.length > 0 && !!lineStack[0] ? lineStack[0].start || 0 : textLength;
+      const nextRangeStartIndex = lineMarkdownRanges.length > 0 && !!lineMarkdownRanges[0] ? lineMarkdownRanges[0].start || 0 : textLength;
 
       //
       const textBeforeRange = line.text.substring(lastRangeEndIndex, range.start);
@@ -225,7 +260,7 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
         addStyling(span, range.type, markdownStyle);
       }
 
-      if (stack.length > 0 && nextRangeStartIndex < endOfCurrentRange && range.type !== 'syntax') {
+      if (lineMarkdownRanges.length > 0 && nextRangeStartIndex < endOfCurrentRange && range.type !== 'syntax') {
         // tag nesting
         parentTreeItem = addItemToTree(tree, root, span, range.type, parentTreeItem, range.start, range.length);
         lastRangeEndIndex = range.start;
