@@ -117,33 +117,41 @@ function createParagraph(text: string | null = null) {
   return p;
 }
 
+function addItemToTree(
+  tree: TreeItem[],
+  rootElement: HTMLElement,
+  element: HTMLElement | Text,
+  type: MarkdownType,
+  parentTreeItem: TreeItem | null,
+  start: number,
+  length: number | null = null,
+) {
+  const contentLength = length || element.textContent!.length;
+  const item: TreeItem = {
+    element,
+    parent: parentTreeItem,
+    children: [],
+    start,
+    length: contentLength,
+    type,
+  };
+
+  if (parentTreeItem) {
+    parentTreeItem.children.push(item);
+    parentTreeItem.element.appendChild(element);
+  } else {
+    tree.push(item);
+    rootElement.appendChild(element);
+  }
+
+  return item;
+}
+
 function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownStyle: PartialMarkdownStyle = {}, disableInlineStyles = false) {
   const root: HTMLElement = document.createElement('div');
   const tree: TreeItem[] = [];
-  let currentTreeItem: TreeItem | null = null;
+  let parentTreeItem: TreeItem | null = null;
   const textLength = text.length;
-
-  function addItemToTree(element: HTMLElement | Text, type: MarkdownType, start: number, length: number | null = null) {
-    const contentLength = length || element.textContent!.length;
-    const item: TreeItem = {
-      element,
-      parent: currentTreeItem,
-      children: [],
-      start,
-      length: contentLength,
-      type,
-    };
-
-    if (currentTreeItem) {
-      currentTreeItem.children.push(item);
-      currentTreeItem.element.appendChild(element);
-    } else {
-      tree.push(item);
-      root.appendChild(element);
-    }
-
-    return item;
-  }
 
   let lineStartIndex = 0;
   const lines: Paragraph[] = text.split('\n').map((line) => {
@@ -153,14 +161,13 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
       length: line.length,
       markdownRanges: [],
     };
-
     lineStartIndex += line.length + 1; // Adding 1 for the newline character
     return lineObject;
   });
 
   if (ranges.length === 0) {
     lines.forEach((line) => {
-      addItemToTree(createParagraph(line.text), 'text', line.start, line.length);
+      addItemToTree(tree, root, createParagraph(line.text), 'text', parentTreeItem, line.start, line.length);
     });
     return root;
   }
@@ -186,9 +193,14 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
     }
   });
 
-  lines.forEach((line) => {
-    currentTreeItem = null;
-    currentTreeItem = addItemToTree(createParagraph(line.markdownRanges.length > 0 ? null : line.text), 'text', line.start, line.length);
+  while (lines.length > 0) {
+    const line = lines.shift();
+    if (!line) {
+      break;
+    }
+
+    parentTreeItem = null;
+    parentTreeItem = addItemToTree(tree, root, createParagraph(line.markdownRanges.length > 0 ? null : line.text), 'text', parentTreeItem, line.start, line.length);
 
     const lineStack = line.markdownRanges;
     let lastRangeEndIndex = 0;
@@ -200,9 +212,10 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
       const endOfCurrentRange = range.start + range.length;
       const nextRangeStartIndex = lineStack.length > 0 && !!lineStack[0] ? lineStack[0].start || 0 : textLength;
 
+      //
       const textBeforeRange = line.text.substring(lastRangeEndIndex, range.start);
       if (textBeforeRange) {
-        addItemToTree(document.createTextNode(textBeforeRange), 'text', lastRangeEndIndex);
+        addItemToTree(tree, root, document.createTextNode(textBeforeRange), 'text', parentTreeItem, lastRangeEndIndex);
       }
 
       const span = document.createElement('span');
@@ -214,24 +227,26 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
 
       if (stack.length > 0 && nextRangeStartIndex < endOfCurrentRange && range.type !== 'syntax') {
         // tag nesting
-        currentTreeItem = addItemToTree(span, range.type, range.start, range.length);
+        parentTreeItem = addItemToTree(tree, root, span, range.type, parentTreeItem, range.start, range.length);
         lastRangeEndIndex = range.start;
       } else {
+        // adding markdown tag
         span.innerText = line.text.substring(range.start, endOfCurrentRange);
-        addItemToTree(span, range.type, range.start, range.length);
+        addItemToTree(tree, root, span, range.type, parentTreeItem, range.start, range.length);
         lastRangeEndIndex = endOfCurrentRange;
 
-        while (currentTreeItem && nextRangeStartIndex >= currentTreeItem.start + currentTreeItem.length) {
-          const textAfterRange = line.text.substring(lastRangeEndIndex, currentTreeItem.start + currentTreeItem.length);
+        // tag unnesting
+        while (parentTreeItem && nextRangeStartIndex >= parentTreeItem.start + parentTreeItem.length) {
+          const textAfterRange = line.text.substring(lastRangeEndIndex, parentTreeItem.start + parentTreeItem.length);
           if (textAfterRange) {
-            addItemToTree(document.createTextNode(textAfterRange), 'text', lastRangeEndIndex);
+            addItemToTree(tree, root, document.createTextNode(textAfterRange), 'text', parentTreeItem, lastRangeEndIndex);
           }
-          lastRangeEndIndex = currentTreeItem.start + currentTreeItem.length;
-          currentTreeItem = currentTreeItem.parent;
+          lastRangeEndIndex = parentTreeItem.start + parentTreeItem.length;
+          parentTreeItem = parentTreeItem.parent;
         }
       }
     }
-  });
+  }
 
   return root;
 }
