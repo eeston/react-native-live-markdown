@@ -15,7 +15,7 @@ const toBeParsedAsHTML: MatcherFunction<[expectedHTML: string]> = function (actu
   const markdownRanges = ranges as MarkdownTypes.MarkdownRange[];
 
   const actualDOM = ParserUtils.parseRangesToHTMLNodes(actual, markdownRanges, {}, true);
-  const actualHTML = actualDOM.innerHTML;
+  const actualHTML = actualDOM.dom.innerHTML;
 
   if (actualHTML === expected) {
     expected = actualHTML;

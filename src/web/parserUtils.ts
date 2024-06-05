@@ -219,7 +219,7 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
     lines.forEach((line) => {
       addItemToTree(tree, root, createParagraph(line.text), 'text', parentTreeItem, line.start, line.length);
     });
-    return root;
+    return {dom: root, tree};
   }
 
   const markdownRanges = ungroupRanges(ranges);
@@ -283,7 +283,7 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
     }
   }
 
-  return root;
+  return {dom: root, tree};
 }
 
 function moveCursor(isFocused: boolean, alwaysMoveCursorToTheEnd: boolean, cursorPosition: number | null, target: HTMLElement) {
@@ -309,6 +309,7 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
   }
   const ranges = global.parseExpensiMarkToRanges(text);
   const markdownRanges: MarkdownRange[] = ranges as MarkdownRange[];
+  let elementTree: TreeItem[] = [];
 
   if (!text || targetElement.innerHTML === '<br>' || (targetElement && targetElement.innerHTML === '\n')) {
     targetElement.innerHTML = '';
@@ -317,8 +318,8 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
 
   // We don't want to parse text with single '\n', because contentEditable represents it as invisible <br />
   if (text) {
-    const dom = parseRangesToHTMLNodes(text, markdownRanges, markdownStyle);
-
+    const {dom, tree} = parseRangesToHTMLNodes(text, markdownRanges, markdownStyle);
+    elementTree = tree;
     if (targetElement.innerHTML !== dom.innerHTML) {
       targetElement.innerHTML = '';
       targetElement.innerText = '';
@@ -335,12 +336,11 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
   }
 
   moveCursor(isFocused, alwaysMoveCursorToTheEnd, cursorPosition, target);
-
   CursorUtils.setPrevText(target);
 
-  return {text, cursorPosition: cursorPosition || 0};
+  return {text, cursorPosition: cursorPosition || 0, elementTree};
 }
 
 export {parseText, parseRangesToHTMLNodes};
 
-export type {MarkdownRange, MarkdownType};
+export type {MarkdownRange, MarkdownType, TreeItem};

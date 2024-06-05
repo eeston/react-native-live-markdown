@@ -76,6 +76,11 @@ type Dimensions = {
 
 let focusTimeout: NodeJS.Timeout | null = null;
 
+type MarkdownTextInputElement = HTMLDivElement &
+  HTMLInputElement & {
+    tree: ParseUtils.TreeItem[];
+  };
+
 // If an Input Method Editor is processing key input, the 'keyCode' is 229.
 // https://www.w3.org/TR/uievents/#determine-keydown-keyup-keyCode
 function isEventComposing(nativeEvent: globalThis.KeyboardEvent) {
@@ -161,7 +166,7 @@ const MarkdownTextInput = React.forwardRef<TextInput, MarkdownTextInputProps>(
   ) => {
     const compositionRef = useRef<boolean>(false);
     const pasteRef = useRef<boolean>(false);
-    const divRef = useRef<HTMLDivElement | null>(null);
+    const divRef = useRef<MarkdownTextInputElement | null>(null);
     const currentlyFocusedField = useRef<HTMLDivElement | null>(null);
     const contentSelection = useRef<Selection | null>(null);
     const className = `react-native-live-markdown-input-${multiline ? 'multiline' : 'singleline'}`;
@@ -198,6 +203,10 @@ const MarkdownTextInput = React.forwardRef<TextInput, MarkdownTextInputProps>(
           return {text: textContent.current, cursorPosition: null};
         }
         const parsedText = ParseUtils.parseText(target, text, cursorPosition, customMarkdownStyles, !multiline);
+
+        if (divRef.current) {
+          divRef.current.tree = parsedText.elementTree;
+        }
         if (history.current && shouldAddToHistory) {
           // We need to normalize the value before saving it to the history to prevent situations when additional new lines break the cursor position calculation logic
           history.current.throttledAdd(parsedText.text, parsedText.cursorPosition);
@@ -552,7 +561,7 @@ const MarkdownTextInput = React.forwardRef<TextInput, MarkdownTextInputProps>(
           (ref as (elementRef: HTMLDivElement | null) => void)(r);
         }
       }
-      divRef.current = r;
+      divRef.current = r as MarkdownTextInputElement;
     };
 
     useClientEffect(
