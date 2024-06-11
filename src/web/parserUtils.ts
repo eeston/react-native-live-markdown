@@ -17,6 +17,7 @@ type TreeItem = {
   element: HTMLElement | Text;
   parent: TreeItem | null;
   children: TreeItem[];
+  relativeStart: number;
 } & MarkdownRange;
 
 type Paragraph = {
@@ -131,6 +132,7 @@ function addItemToTree(
     element,
     parent: parentTreeItem,
     children: [],
+    relativeStart: start - (parentTreeItem?.start || 0),
     start,
     length: contentLength,
     type,
@@ -174,14 +176,13 @@ function mergeLinesWithMultilineTags(lines: Paragraph[]) {
     }
 
     // start merging if line contains range that ends in a different line
-    if (lineWithMultilineTag && multiLineRange && currentLine.start <= lineWithMultilineTag.start + multiLineRange.start + multiLineRange.length) {
+    if (lineWithMultilineTag && multiLineRange && currentLine.start <= multiLineRange.start + multiLineRange.length) {
       lineWithMultilineTag.text += `\n${currentLine.text}`;
-      const len = lineWithMultilineTag.length + 1;
-      lineWithMultilineTag.markdownRanges.push(...currentLine.markdownRanges.map((range) => ({...range, start: len + range.start})));
+      lineWithMultilineTag.markdownRanges.push(...currentLine.markdownRanges);
       lineWithMultilineTag.length += currentLine.length + 1;
       lines.splice(i, 1);
     } else {
-      multiLineRange = currentLine.markdownRanges.find((range) => range.start + range.length > currentLine.length) || null;
+      multiLineRange = currentLine.markdownRanges.find((range) => range.start + range.length > currentLine.start + currentLine.length) || null;
       lineWithMultilineTag = multiLineRange ? currentLine : null;
       i += 1;
     }
@@ -200,10 +201,7 @@ function groupMarkdownRangesByLine(lines: Paragraph[], ranges: MarkdownRange[]) 
     }
 
     if (currentLine) {
-      currentLine.markdownRanges.push({
-        ...range,
-        start: start - currentLine.start,
-      });
+      currentLine.markdownRanges.push(range);
     }
   });
 }
@@ -227,17 +225,20 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
   groupMarkdownRangesByLine(lines, markdownRanges);
   mergeLinesWithMultilineTags(lines);
 
+  let lastRangeEndIndex = 0;
   while (lines.length > 0) {
     const line = lines.shift();
     if (!line) {
       break;
     }
 
+    // preparing line paragraph element for markdown text
     parentTreeItem = null;
     parentTreeItem = addItemToTree(tree, root, createParagraph(line.markdownRanges.length > 0 ? null : line.text), 'text', parentTreeItem, line.start, line.length);
+    lastRangeEndIndex = line.start;
 
     const lineMarkdownRanges = line.markdownRanges;
-    let lastRangeEndIndex = 0;
+    // go through all markdown ranges in the line
     while (lineMarkdownRanges.length > 0) {
       const range = lineMarkdownRanges.shift();
       if (!range) {
@@ -247,8 +248,7 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
       const endOfCurrentRange = range.start + range.length;
       const nextRangeStartIndex = lineMarkdownRanges.length > 0 && !!lineMarkdownRanges[0] ? lineMarkdownRanges[0].start || 0 : textLength;
 
-      //
-      const textBeforeRange = line.text.substring(lastRangeEndIndex, range.start);
+      const textBeforeRange = text.substring(lastRangeEndIndex, range.start);
       if (textBeforeRange) {
         addItemToTree(tree, root, document.createTextNode(textBeforeRange), 'text', parentTreeItem, lastRangeEndIndex);
       }
@@ -266,11 +266,11 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
         lastRangeEndIndex = range.start;
       } else {
         // adding markdown tag
-        span.innerText = line.text.substring(range.start, endOfCurrentRange);
+        span.innerText = text.substring(range.start, endOfCurrentRange);
         addItemToTree(tree, root, span, range.type, parentTreeItem, range.start, range.length);
         lastRangeEndIndex = endOfCurrentRange;
 
-        // tag unnesting
+        // // tag unnesting
         while (parentTreeItem && nextRangeStartIndex >= parentTreeItem.start + parentTreeItem.length) {
           const textAfterRange = line.text.substring(lastRangeEndIndex, parentTreeItem.start + parentTreeItem.length);
           if (textAfterRange) {
