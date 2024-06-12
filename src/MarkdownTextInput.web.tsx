@@ -16,6 +16,7 @@ import {StyleSheet} from 'react-native';
 import * as ParseUtils from './web/parserUtils';
 import * as CursorUtils from './web/cursorUtils';
 import * as StyleUtils from './styleUtils';
+import type * as TreeUtilsTypes from './web/treeUtils';
 import type * as MarkdownTextInputDecoratorViewNativeComponent from './MarkdownTextInputDecoratorViewNativeComponent';
 import './web/MarkdownTextInput.css';
 import InputHistory from './web/InputHistory';
@@ -78,7 +79,7 @@ let focusTimeout: NodeJS.Timeout | null = null;
 
 type MarkdownTextInputElement = HTMLDivElement &
   HTMLInputElement & {
-    tree: ParseUtils.TreeItem[];
+    tree: TreeUtilsTypes.TreeItem[];
   };
 
 // If an Input Method Editor is processing key input, the 'keyCode' is 229.

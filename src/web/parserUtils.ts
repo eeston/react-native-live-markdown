@@ -1,8 +1,11 @@
 import * as CursorUtils from './cursorUtils';
 import type * as StyleUtilsTypes from '../styleUtils';
 import * as BrowserUtils from './browserUtils';
+import * as TreeUtils from './treeUtils';
+import type * as TreeUtilsTypes from './treeUtils';
 
 type PartialMarkdownStyle = StyleUtilsTypes.PartialMarkdownStyle;
+type TreeItem = TreeUtilsTypes.TreeItem;
 
 type MarkdownType = 'bold' | 'italic' | 'strikethrough' | 'emoji' | 'link' | 'code' | 'pre' | 'blockquote' | 'h1' | 'syntax' | 'mention-here' | 'mention-user' | 'mention-report';
 
@@ -11,16 +14,6 @@ type MarkdownRange = {
   start: number;
   length: number;
   depth?: number;
-};
-
-type ElementType = MarkdownType | 'text' | 'br';
-
-type TreeItem = Omit<MarkdownRange, 'type'> & {
-  element: HTMLElement | Text;
-  parent: TreeItem | null;
-  children: TreeItem[];
-  relativeStart: number;
-  type: ElementType;
 };
 
 type Paragraph = {
@@ -121,37 +114,6 @@ function createParagraph(text: string | null = null) {
   return p;
 }
 
-function addItemToTree(
-  tree: TreeItem[],
-  rootElement: HTMLElement,
-  element: HTMLElement | Text,
-  type: ElementType,
-  parentTreeItem: TreeItem | null,
-  start: number,
-  length: number | null = null,
-) {
-  const contentLength = length || element.textContent!.length;
-  const item: TreeItem = {
-    element,
-    parent: parentTreeItem,
-    children: [],
-    relativeStart: start - (parentTreeItem?.start || 0),
-    start,
-    length: contentLength,
-    type,
-  };
-
-  if (parentTreeItem) {
-    parentTreeItem.children.push(item);
-    parentTreeItem.element.appendChild(element);
-  } else {
-    tree.push(item);
-    rootElement.appendChild(element);
-  }
-
-  return item;
-}
-
 function splitTextIntoLines(text: string): Paragraph[] {
   let lineStartIndex = 0;
   const lines: Paragraph[] = text.split('\n').map((line) => {
@@ -211,17 +173,25 @@ function groupMarkdownRangesByLine(lines: Paragraph[], ranges: MarkdownRange[]) 
 function addTextToElement(tree: TreeItem[], rootElement: HTMLElement, parentTreeItem: TreeItem | null, text: string) {
   const lines = text.split('\n');
   let startIndex = parentTreeItem?.start || 0;
+  if (parentTreeItem?.children && parentTreeItem.children.length > 0) {
+    const children = parentTreeItem.children;
+    const lastChild = children[children.length - 1];
+    if (lastChild) {
+      startIndex = lastChild.start + lastChild.length;
+    }
+  }
+
   lines.forEach((line, index) => {
     if (line !== '') {
       const span = document.createElement('span');
       span.innerText = line;
-      addItemToTree(tree, rootElement, span, 'text', parentTreeItem, startIndex, line.length);
+      TreeUtils.addItemToTree(tree, rootElement, span, 'text', parentTreeItem, startIndex, line.length);
     }
 
     startIndex += line.length;
 
-    if (index < lines.length - 1) {
-      addItemToTree(tree, rootElement, document.createElement('br'), 'br', parentTreeItem, startIndex, 1);
+    if (index < lines.length - 1 || (index === 0 && line === '')) {
+      TreeUtils.addItemToTree(tree, rootElement, document.createElement('br'), 'br', parentTreeItem, startIndex, 1);
       startIndex += 1;
     }
   });
@@ -236,7 +206,7 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
 
   if (ranges.length === 0) {
     lines.forEach((line) => {
-      addItemToTree(tree, root, createParagraph(line.text), 'text', parentTreeItem, line.start, line.length);
+      TreeUtils.addItemToTree(tree, root, createParagraph(line.text), 'text', parentTreeItem, line.start, line.length);
     });
     return {dom: root, tree};
   }
@@ -255,7 +225,7 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
 
     // preparing line paragraph element for markdown text
     parentTreeItem = null;
-    parentTreeItem = addItemToTree(tree, root, createParagraph(null), 'text', parentTreeItem, line.start, line.length);
+    parentTreeItem = TreeUtils.addItemToTree(tree, root, createParagraph(null), 'text', parentTreeItem, line.start, line.length);
     if (line.markdownRanges.length === 0) {
       addTextToElement(tree, root, parentTreeItem, line.text);
     }
@@ -289,11 +259,11 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
 
       if (lineMarkdownRanges.length > 0 && nextRangeStartIndex < endOfCurrentRange && range.type !== 'syntax') {
         // tag nesting
-        parentTreeItem = addItemToTree(tree, root, span, range.type, parentTreeItem, range.start, range.length);
+        parentTreeItem = TreeUtils.addItemToTree(tree, root, span, range.type, parentTreeItem, range.start, range.length);
         lastRangeEndIndex = range.start;
       } else {
         // adding markdown tag
-        const spanTreeItem = addItemToTree(tree, root, span, range.type, parentTreeItem, range.start, range.length);
+        const spanTreeItem = TreeUtils.addItemToTree(tree, root, span, range.type, parentTreeItem, range.start, range.length);
         addTextToElement(tree, root, spanTreeItem, text.substring(range.start, endOfCurrentRange));
 
         lastRangeEndIndex = endOfCurrentRange;
@@ -371,4 +341,4 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
 
 export {parseText, parseRangesToHTMLNodes};
 
-export type {MarkdownRange, MarkdownType, TreeItem};
+export type {MarkdownRange, MarkdownType};

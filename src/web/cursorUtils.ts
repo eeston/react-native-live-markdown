@@ -1,4 +1,5 @@
 import * as BrowserUtils from './browserUtils';
+import * as TreeUtils from './treeUtils';
 
 let prevTextLength: number | undefined;
 
@@ -113,16 +114,32 @@ function moveCursorToEnd(target: HTMLElement) {
 }
 
 function getCurrentCursorPosition(target: HTMLElement) {
+  function getHTMLElement(node: Node) {
+    let element = node as HTMLElement | Text;
+    if (element instanceof Text) {
+      element = node.parentElement as HTMLElement;
+    }
+    return element;
+  }
+
   const selection = window.getSelection();
   if (!selection || (selection && selection.rangeCount === 0)) {
     return null;
   }
+
   const range = selection.getRangeAt(0);
-  const preSelectionRange = range.cloneRange();
-  preSelectionRange.selectNodeContents(target);
-  preSelectionRange.setEnd(range.startContainer, range.startOffset);
-  const start = preSelectionRange.toString().length;
-  const end = start + range.toString().length;
+  const startElement = getHTMLElement(range.startContainer);
+  const endElement = getHTMLElement(range.endContainer);
+  const treeItem = TreeUtils.findElementInTree(target.tree, startElement);
+  const endTreeItem = TreeUtils.findElementInTree(target.tree, endElement);
+
+  let start = -1;
+  let end = -1;
+  if (treeItem && endTreeItem) {
+    start = treeItem.start + range.startOffset;
+    end = endTreeItem.start + range.endOffset;
+  }
+
   return {start, end};
 }
 
