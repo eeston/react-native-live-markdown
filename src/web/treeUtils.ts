@@ -50,15 +50,14 @@ function findElementInTree(tree: TreeItem[], element: HTMLElement) {
   let el: TreeItem | null = null;
 
   while (tree && indexes && indexes.length > 0) {
-    const item = indexes.shift();
-    if (!item) {
+    const index = Number(indexes.shift() || -1);
+    if (index < 0) {
       break;
     }
-    const index = Number(item);
 
     if (i === 0) {
       el = tree[index] || null;
-    } else if (el && index) {
+    } else if (el) {
       el = el.children[index] || null;
     }
 

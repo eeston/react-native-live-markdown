@@ -129,14 +129,15 @@ function getCurrentCursorPosition(target: HTMLElement) {
 
   const range = selection.getRangeAt(0);
   const startElement = getHTMLElement(range.startContainer);
-  const endElement = getHTMLElement(range.endContainer);
-  const treeItem = TreeUtils.findElementInTree(target.tree, startElement);
+  const endElement = range.startContainer === range.endContainer ? startElement : getHTMLElement(range.endContainer);
+
+  const startTreeItem = TreeUtils.findElementInTree(target.tree, startElement);
   const endTreeItem = TreeUtils.findElementInTree(target.tree, endElement);
 
   let start = -1;
   let end = -1;
-  if (treeItem && endTreeItem) {
-    start = treeItem.start + range.startOffset;
+  if (startTreeItem && endTreeItem) {
+    start = startTreeItem.start + range.startOffset;
     end = endTreeItem.start + range.endOffset;
   }
 
