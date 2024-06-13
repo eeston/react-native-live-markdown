@@ -338,7 +338,7 @@ const MarkdownTextInput = React.forwardRef<TextInput, MarkdownTextInputProps>(
       childNodes.forEach((node, index) => {
         const nodeCopy = node.cloneNode(true) as HTMLElement;
         if (index < childNodes.length - 1) {
-          nodeCopy.innerHTML = nodeCopy.innerHTML.replaceAll('<br>', '\n');
+          nodeCopy.innerHTML = nodeCopy.innerHTML.replaceAll(/<br.*?>/g, '\n');
         }
         let nodeText = nodeCopy.textContent ?? '';
 
