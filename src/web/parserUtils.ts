@@ -170,7 +170,7 @@ function groupMarkdownRangesByLine(lines: Paragraph[], ranges: MarkdownRange[]) 
   });
 }
 
-function addTextToElement(tree: TreeItem[], rootElement: HTMLElement, parentTreeItem: TreeItem | null, text: string) {
+function addTextToElement(parentTreeItem: TreeItem, text: string) {
   const lines = text.split('\n');
   let startIndex = parentTreeItem?.start || 0;
   if (parentTreeItem?.children && parentTreeItem.children.length > 0) {
@@ -185,13 +185,13 @@ function addTextToElement(tree: TreeItem[], rootElement: HTMLElement, parentTree
     if (line !== '') {
       const span = document.createElement('span');
       span.innerText = line;
-      TreeUtils.addItemToTree(tree, rootElement, span, 'text', parentTreeItem, startIndex, line.length);
+      TreeUtils.addItemToTree(span, 'text', parentTreeItem, startIndex, line.length);
     }
 
     startIndex += line.length;
 
     if (index < lines.length - 1 || (index === 0 && line === '')) {
-      TreeUtils.addItemToTree(tree, rootElement, document.createElement('br'), 'br', parentTreeItem, startIndex, 1);
+      TreeUtils.addItemToTree(document.createElement('br'), 'br', parentTreeItem, startIndex, 1);
       startIndex += 1;
     }
   });
@@ -199,16 +199,27 @@ function addTextToElement(tree: TreeItem[], rootElement: HTMLElement, parentTree
 
 function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownStyle: PartialMarkdownStyle = {}, disableInlineStyles = false) {
   const root: HTMLElement = document.createElement('div');
-  const tree: TreeItem[] = [];
-  let parentTreeItem: TreeItem | null = null;
-  const textLength = text.length;
+  const textLength = text.replace(/\n/g, '\\n').length;
+  const treeRoot: TreeItem = {
+    element: root,
+    parent: null,
+    children: [],
+    relativeStart: 0,
+    start: 0,
+    length: textLength,
+    type: 'text',
+    orderIndex: '',
+  };
+
+  let parentTreeItem: TreeItem = treeRoot;
+
   const lines = splitTextIntoLines(text);
 
   if (ranges.length === 0) {
     lines.forEach((line) => {
-      TreeUtils.addItemToTree(tree, root, createParagraph(line.text), 'text', parentTreeItem, line.start, line.length);
+      TreeUtils.addItemToTree(createParagraph(line.text), 'text', parentTreeItem, line.start, line.length);
     });
-    return {dom: root, tree};
+    return {dom: root, treeRoot};
   }
 
   const markdownRanges = ungroupRanges(ranges);
@@ -224,10 +235,10 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
     }
 
     // preparing line paragraph element for markdown text
-    parentTreeItem = null;
-    parentTreeItem = TreeUtils.addItemToTree(tree, root, createParagraph(null), 'text', parentTreeItem, line.start, line.length);
+    parentTreeItem = treeRoot;
+    parentTreeItem = TreeUtils.addItemToTree(createParagraph(null), 'text', parentTreeItem, line.start, line.length);
     if (line.markdownRanges.length === 0) {
-      addTextToElement(tree, root, parentTreeItem, line.text);
+      addTextToElement(parentTreeItem, line.text);
     }
 
     lastRangeEndIndex = line.start;
@@ -246,7 +257,7 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
       // add text before the markdown range
       const textBeforeRange = line.text.substring(lastRangeEndIndex - line.start, range.start - line.start);
       if (textBeforeRange) {
-        addTextToElement(tree, root, parentTreeItem, textBeforeRange);
+        addTextToElement(parentTreeItem, textBeforeRange);
       }
 
       // create markdown span element
@@ -259,29 +270,27 @@ function parseRangesToHTMLNodes(text: string, ranges: MarkdownRange[], markdownS
 
       if (lineMarkdownRanges.length > 0 && nextRangeStartIndex < endOfCurrentRange && range.type !== 'syntax') {
         // tag nesting
-        parentTreeItem = TreeUtils.addItemToTree(tree, root, span, range.type, parentTreeItem, range.start, range.length);
+        parentTreeItem = TreeUtils.addItemToTree(span, range.type, parentTreeItem, range.start, range.length);
         lastRangeEndIndex = range.start;
       } else {
         // adding markdown tag
-        const spanTreeItem = TreeUtils.addItemToTree(tree, root, span, range.type, parentTreeItem, range.start, range.length);
-        addTextToElement(tree, root, spanTreeItem, text.substring(range.start, endOfCurrentRange));
-
+        const spanTreeItem = TreeUtils.addItemToTree(span, range.type, parentTreeItem, range.start, range.length);
+        addTextToElement(spanTreeItem, text.substring(range.start, endOfCurrentRange));
         lastRangeEndIndex = endOfCurrentRange;
-
         // tag unnesting and adding text after the tag
-        while (parentTreeItem && nextRangeStartIndex >= parentTreeItem.start + parentTreeItem.length) {
+        while (parentTreeItem.parent !== null && nextRangeStartIndex >= parentTreeItem.start + parentTreeItem.length) {
           const textAfterRange = line.text.substring(lastRangeEndIndex - line.start, parentTreeItem.start - line.start + parentTreeItem.length);
           if (textAfterRange) {
-            addTextToElement(tree, root, parentTreeItem, textAfterRange);
+            addTextToElement(parentTreeItem, textAfterRange);
           }
           lastRangeEndIndex = parentTreeItem.start + parentTreeItem.length;
-          parentTreeItem = parentTreeItem.parent;
+          parentTreeItem = parentTreeItem.parent || treeRoot;
         }
       }
     }
   }
 
-  return {dom: root, tree};
+  return {dom: root, treeRoot};
 }
 
 function moveCursor(isFocused: boolean, alwaysMoveCursorToTheEnd: boolean, cursorPosition: number | null, target: HTMLElement) {
@@ -307,7 +316,7 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
   }
   const ranges = global.parseExpensiMarkToRanges(text);
   const markdownRanges: MarkdownRange[] = ranges as MarkdownRange[];
-  let elementTree: TreeItem[] = [];
+  let tree: TreeItem | null = null;
 
   if (!text || targetElement.innerHTML === '<br>' || (targetElement && targetElement.innerHTML === '\n')) {
     targetElement.innerHTML = '';
@@ -316,8 +325,8 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
 
   // We don't want to parse text with single '\n', because contentEditable represents it as invisible <br />
   if (text) {
-    const {dom, tree} = parseRangesToHTMLNodes(text, markdownRanges, markdownStyle);
-    elementTree = tree;
+    const {dom, treeRoot} = parseRangesToHTMLNodes(text, markdownRanges, markdownStyle);
+    tree = treeRoot;
     if (targetElement.innerHTML !== dom.innerHTML) {
       targetElement.innerHTML = '';
       targetElement.innerText = '';
@@ -336,7 +345,7 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
   moveCursor(isFocused, alwaysMoveCursorToTheEnd, cursorPosition, target);
   CursorUtils.setPrevText(target);
 
-  return {text, cursorPosition: cursorPosition || 0, elementTree};
+  return {text, cursorPosition: cursorPosition || 0, tree};
 }
 
 export {parseText, parseRangesToHTMLNodes};

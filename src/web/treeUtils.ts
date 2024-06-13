@@ -15,8 +15,9 @@ type TreeItem = Omit<MarkdownRange, 'type'> & {
   orderIndex: string;
 };
 
-function addItemToTree(tree: TreeItem[], rootElement: HTMLElement, element: HTMLElement, type: ElementType, parentTreeItem: TreeItem | null, start: number, length: number | null = null) {
+function addItemToTree(element: HTMLElement, type: ElementType, parentTreeItem: TreeItem, start: number, length: number | null = null) {
   const contentLength = length || element.textContent!.length;
+  const parentChildrenCount = parentTreeItem?.children.length || 0;
   const item: TreeItem = {
     element,
     parent: parentTreeItem,
@@ -25,47 +26,33 @@ function addItemToTree(tree: TreeItem[], rootElement: HTMLElement, element: HTML
     start,
     length: contentLength,
     type,
-    orderIndex: !parentTreeItem ? `${rootElement.childNodes.length || 0}` : `${parentTreeItem.orderIndex},${parentTreeItem.children.length || 0}`,
+    orderIndex: parentTreeItem.parent === null ? `${parentChildrenCount}` : `${parentTreeItem.orderIndex},${parentChildrenCount}`,
   };
 
   element.setAttribute('data-id', item.orderIndex);
 
-  if (parentTreeItem) {
-    parentTreeItem.children.push(item);
-    parentTreeItem.element.appendChild(element);
-  } else {
-    tree.push(item);
-    rootElement.appendChild(element);
-  }
+  parentTreeItem.children.push(item);
+  parentTreeItem.element.appendChild(element);
 
   return item;
 }
 
-function findElementInTree(tree: TreeItem[], element: HTMLElement) {
+function findElementInTree(treeRoot: TreeItem, element: HTMLElement) {
   if (!element || !element.hasAttribute('data-id')) {
     return;
   }
   const indexes = element.getAttribute('data-id')?.split(',');
-  let i = 0;
-  let el: TreeItem | null = null;
+  let el: TreeItem | null = treeRoot;
 
-  while (tree && indexes && indexes.length > 0) {
+  while (el && indexes && indexes.length > 0) {
     const index = Number(indexes.shift() || -1);
     if (index < 0) {
       break;
     }
 
-    if (i === 0) {
-      el = tree[index] || null;
-    } else if (el) {
+    if (el) {
       el = el.children[index] || null;
     }
-
-    if (el === null) {
-      break;
-    }
-
-    i += 1;
   }
 
   return el;

@@ -79,7 +79,7 @@ let focusTimeout: NodeJS.Timeout | null = null;
 
 type MarkdownTextInputElement = HTMLDivElement &
   HTMLInputElement & {
-    tree: TreeUtilsTypes.TreeItem[];
+    tree: TreeUtilsTypes.TreeItem;
   };
 
 // If an Input Method Editor is processing key input, the 'keyCode' is 229.
@@ -205,8 +205,8 @@ const MarkdownTextInput = React.forwardRef<TextInput, MarkdownTextInputProps>(
         }
         const parsedText = ParseUtils.parseText(target, text, cursorPosition, customMarkdownStyles, !multiline);
 
-        if (divRef.current) {
-          divRef.current.tree = parsedText.elementTree;
+        if (divRef.current && parsedText.tree) {
+          divRef.current.tree = parsedText.tree;
         }
         if (history.current && shouldAddToHistory) {
           // We need to normalize the value before saving it to the history to prevent situations when additional new lines break the cursor position calculation logic
