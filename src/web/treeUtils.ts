@@ -4,10 +4,10 @@ type MarkdownType = ParserUtilsTypes.MarkdownType;
 
 type MarkdownRange = ParserUtilsTypes.MarkdownRange;
 
-type ElementType = MarkdownType | 'text' | 'br';
+type ElementType = MarkdownType | 'line' | 'text' | 'br';
 
 type TreeItem = Omit<MarkdownRange, 'type'> & {
-  element: HTMLElement | Text;
+  element: HTMLElement;
   parent: TreeItem | null;
   children: TreeItem[];
   relativeStart: number;
@@ -15,26 +15,59 @@ type TreeItem = Omit<MarkdownRange, 'type'> & {
   orderIndex: string;
 };
 
-function addItemToTree(element: HTMLElement, type: ElementType, parentTreeItem: TreeItem, start: number, length: number | null = null) {
-  const contentLength = length || element.textContent!.length;
+function addItemToTree(element: HTMLElement, parentTreeItem: TreeItem, type: ElementType) {
+  const contentLength = element.innerText.length;
   const parentChildrenCount = parentTreeItem?.children.length || 0;
+
+  let startIndex = parentTreeItem.start;
+  if (parentChildrenCount > 0) {
+    const lastParentChild = parentTreeItem.children[parentChildrenCount - 1];
+    if (lastParentChild) {
+      startIndex = lastParentChild.start + lastParentChild.length;
+      startIndex += lastParentChild.type === 'line' ? 1 : 0;
+    }
+  }
+
   const item: TreeItem = {
     element,
     parent: parentTreeItem,
     children: [],
-    relativeStart: start - (parentTreeItem?.start || 0),
-    start,
+    relativeStart: startIndex - (parentTreeItem?.start || 0),
+    start: startIndex,
     length: contentLength,
     type,
     orderIndex: parentTreeItem.parent === null ? `${parentChildrenCount}` : `${parentTreeItem.orderIndex},${parentChildrenCount}`,
   };
 
   element.setAttribute('data-id', item.orderIndex);
-
   parentTreeItem.children.push(item);
-  parentTreeItem.element.appendChild(element);
-
   return item;
+}
+
+function buildTree(rootElement: HTMLElement) {
+  const rootTreeItem: TreeItem = {
+    element: rootElement,
+    parent: null,
+    children: [],
+    relativeStart: 0,
+    start: 0,
+    length: rootElement.textContent!.length,
+    type: 'text',
+    orderIndex: '',
+  };
+  const stack = [rootTreeItem];
+  while (stack.length > 0) {
+    const treeItem = stack.pop();
+    if (!treeItem) {
+      break;
+    }
+
+    Array.from(treeItem.element.children).forEach((childElement) => {
+      const newTreeItem = addItemToTree(childElement as HTMLElement, treeItem, childElement.getAttribute('data-type') as ElementType);
+      stack.push(newTreeItem);
+    });
+  }
+  return rootTreeItem;
 }
 
 function findElementInTree(treeRoot: TreeItem, element: HTMLElement) {
@@ -58,6 +91,6 @@ function findElementInTree(treeRoot: TreeItem, element: HTMLElement) {
   return el;
 }
 
-export {addItemToTree, findElementInTree};
+export {addItemToTree, findElementInTree, buildTree};
 
 export type {TreeItem};
