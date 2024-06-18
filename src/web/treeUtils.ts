@@ -63,7 +63,7 @@ function buildTree(rootElement: HTMLElement, text: string) {
     }
 
     Array.from(treeItem.element.children).forEach((childElement) => {
-      const newTreeItem = addItemToTree(childElement as HTMLElement, treeItem, childElement.getAttribute('data-type') as ElementType);
+      const newTreeItem = addItemToTree(childElement as HTMLElement, treeItem, (childElement.getAttribute('data-type') as ElementType) || childElement.nodeName === 'BR' ? 'br' : 'text');
       stack.push(newTreeItem);
     });
   }
@@ -102,7 +102,7 @@ function getElementByIndex(treeRoot: TreeItem, index: number) {
       break;
     }
 
-    if (index >= child.start && index < child.start + child.length) {
+    if (index >= child.start && index <= child.start + child.length) {
       if (child.children.length === 0) {
         return child;
       }

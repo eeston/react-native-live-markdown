@@ -44,8 +44,17 @@ function setCursorPosition(target: HTMLElement, start: number, end: number | nul
     throw new Error('Invalid start or end tree item');
   }
 
-  range.setStart(startTreeItem.element.childNodes[0] as ChildNode, start - startTreeItem.start);
-  range.setEnd(startTreeItem.element.childNodes[0] as ChildNode, start - startTreeItem.start);
+  if (startTreeItem.type === 'br') {
+    range.setStartBefore(startTreeItem.element);
+  } else {
+    range.setStart(startTreeItem.element.childNodes[0] as ChildNode, start - startTreeItem.start);
+  }
+
+  if (startTreeItem.type === 'br') {
+    range.setEndBefore(startTreeItem.element);
+  } else {
+    range.setEnd(startTreeItem.element.childNodes[0] as ChildNode, start - startTreeItem.start);
+  }
 
   if (!end) {
     range.collapse(true);
