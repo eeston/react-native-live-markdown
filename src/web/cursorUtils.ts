@@ -51,9 +51,9 @@ function setCursorPosition(target: HTMLElement, start: number, end: number | nul
   }
 
   if (startTreeItem.type === 'br') {
-    range.setEndBefore(startTreeItem.element);
+    range.setEndBefore(endTreeItem.element);
   } else {
-    range.setEnd(startTreeItem.element.childNodes[0] as ChildNode, start - startTreeItem.start);
+    range.setEnd(endTreeItem.element.childNodes[0] as ChildNode, (end || start) - endTreeItem.start);
   }
 
   if (!end) {

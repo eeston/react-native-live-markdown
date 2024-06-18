@@ -16,7 +16,7 @@ type TreeItem = Omit<MarkdownRange, 'type'> & {
 };
 
 function addItemToTree(element: HTMLElement, parentTreeItem: TreeItem, type: ElementType) {
-  const contentLength = element.innerText.length;
+  const contentLength = element.nodeName === 'BR' ? 1 : element.innerText.length;
   const parentChildrenCount = parentTreeItem?.children.length || 0;
 
   let startIndex = parentTreeItem.start;
@@ -45,6 +45,16 @@ function addItemToTree(element: HTMLElement, parentTreeItem: TreeItem, type: Ele
 }
 
 function buildTree(rootElement: HTMLElement, text: string) {
+  function getElementType(element: HTMLElement): ElementType {
+    if (element.nodeName === 'BR') {
+      return 'br';
+    }
+    if (element.nodeName === 'P') {
+      return 'line';
+    }
+
+    return (element.getAttribute('data-type') as ElementType) || 'text';
+  }
   const rootTreeItem: TreeItem = {
     element: rootElement,
     parent: null,
@@ -63,7 +73,7 @@ function buildTree(rootElement: HTMLElement, text: string) {
     }
 
     Array.from(treeItem.element.children).forEach((childElement) => {
-      const newTreeItem = addItemToTree(childElement as HTMLElement, treeItem, (childElement.getAttribute('data-type') as ElementType) || childElement.nodeName === 'BR' ? 'br' : 'text');
+      const newTreeItem = addItemToTree(childElement as HTMLElement, treeItem, getElementType(childElement as HTMLElement));
       stack.push(newTreeItem);
     });
   }
