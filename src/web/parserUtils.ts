@@ -341,7 +341,7 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
       targetElement.innerText = '';
       targetElement.innerHTML = dom.innerHTML || '';
 
-      tree = TreeUtils.buildTree(targetElement);
+      tree = TreeUtils.buildTree(targetElement, text);
 
       if (BrowserUtils.isChromium) {
         moveCursor(isFocused, alwaysMoveCursorToTheEnd, cursorPosition, target);

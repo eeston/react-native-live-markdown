@@ -44,14 +44,14 @@ function addItemToTree(element: HTMLElement, parentTreeItem: TreeItem, type: Ele
   return item;
 }
 
-function buildTree(rootElement: HTMLElement) {
+function buildTree(rootElement: HTMLElement, text: string) {
   const rootTreeItem: TreeItem = {
     element: rootElement,
     parent: null,
     children: [],
     relativeStart: 0,
     start: 0,
-    length: rootElement.textContent!.length,
+    length: text.replace(/\n/g, '\\n').length,
     type: 'text',
     orderIndex: '',
   };
