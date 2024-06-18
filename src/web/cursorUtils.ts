@@ -30,64 +30,22 @@ function setPrevText(target: HTMLElement) {
 
 function setCursorPosition(target: HTMLElement, start: number, end: number | null = null) {
   // We don't want to move the cursor if the target is not focused
-  if (target !== document.activeElement) {
+  if (target !== document.activeElement || start < 0 || (end && end < 0)) {
     return;
   }
 
   const range = document.createRange();
   range.selectNodeContents(target);
 
-  const textNodes: Text[] = [];
-  findTextNodes(textNodes, target);
+  const startTreeItem = TreeUtils.getElementByIndex(target.tree, start);
+  const endTreeItem = end && startTreeItem && end < startTreeItem.start && end >= startTreeItem.start + startTreeItem.length ? TreeUtils.getElementByIndex(target.tree, end) : startTreeItem;
 
-  // These are utilities for handling the boundary cases (especially onEnter)
-  // prevChar & nextChar are characters before & after the target cursor position
-  const textCharacters = textNodes
-    .map((e) => e.nodeValue ?? '')
-    ?.join('')
-    ?.split('');
-  const prevChar = textCharacters?.[start - 1] ?? '';
-  const nextChar = textCharacters?.[start] ?? '';
-
-  let charCount = 0;
-  let startNode: Text | null = null;
-  let endNode: Text | null = null;
-  const n = textNodes.length;
-  for (let i = 0; i < n; ++i) {
-    const textNode = textNodes[i];
-    if (textNode) {
-      const nextCharCount = charCount + textNode.length;
-
-      if (!startNode && start >= charCount && (start <= nextCharCount || (start === nextCharCount && i < n - 1))) {
-        startNode = textNode;
-
-        // There are 4 cases to consider here:
-        // 1. Caret in front of a character, when pressing enter
-        // 2. Caret at the end of a line (not last one)
-        // 3. Caret at the end of whole input, when pressing enter
-        // 4. All other placements
-        if (prevChar === '\n' && prevTextLength !== undefined && prevTextLength < textCharacters.length) {
-          if (nextChar !== '\n') {
-            range.setStart(textNodes[i + 1] as Node, 0);
-          } else if (i !== textNodes.length - 1) {
-            range.setStart(textNodes[i] as Node, 1);
-          } else {
-            range.setStart(textNode, start - charCount);
-          }
-        } else {
-          range.setStart(textNode, start - charCount);
-        }
-        if (!end) {
-          break;
-        }
-      }
-      if (end && !endNode && end >= charCount && (end <= nextCharCount || (end === nextCharCount && i < n - 1))) {
-        endNode = textNode;
-        range.setEnd(textNode, end - charCount);
-      }
-      charCount = nextCharCount;
-    }
+  if (!startTreeItem || !endTreeItem) {
+    throw new Error('Invalid start or end tree item');
   }
+
+  range.setStart(startTreeItem.element.childNodes[0] as ChildNode, start - startTreeItem.start);
+  range.setEnd(startTreeItem.element.childNodes[0] as ChildNode, start - startTreeItem.start);
 
   if (!end) {
     range.collapse(true);

@@ -91,6 +91,30 @@ function findElementInTree(treeRoot: TreeItem, element: HTMLElement) {
   return el;
 }
 
-export {addItemToTree, findElementInTree, buildTree};
+function getElementByIndex(treeRoot: TreeItem, index: number) {
+  let el: TreeItem | null = treeRoot;
+
+  let i = 0;
+  while (el && el.children.length > 0 && i < el.children.length) {
+    const child = el.children[i] as TreeItem;
+
+    if (!child) {
+      break;
+    }
+
+    if (index >= child.start && index < child.start + child.length) {
+      if (child.children.length === 0) {
+        return child;
+      }
+      el = child;
+      i = 0;
+    } else {
+      i++;
+    }
+  }
+  return null;
+}
+
+export {addItemToTree, findElementInTree, getElementByIndex, buildTree};
 
 export type {TreeItem};
