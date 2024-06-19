@@ -1,33 +1,6 @@
 import * as BrowserUtils from './browserUtils';
 import * as TreeUtils from './treeUtils';
 
-let prevTextLength: number | undefined;
-
-function findTextNodes(textNodes: Text[], node: ChildNode) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    textNodes.push(node as Text);
-  } else {
-    for (let i = 0, length = node.childNodes.length; i < length; ++i) {
-      const childNode = node.childNodes[i];
-      if (childNode) {
-        findTextNodes(textNodes, childNode);
-      }
-    }
-  }
-}
-
-function setPrevText(target: HTMLElement) {
-  let text = [];
-  const textNodes: Text[] = [];
-  findTextNodes(textNodes, target);
-  text = textNodes
-    .map((e) => e.nodeValue ?? '')
-    ?.join('')
-    ?.split('');
-
-  prevTextLength = text.length;
-}
-
 function setCursorPosition(target: HTMLElement, start: number, end: number | null = null) {
   // We don't want to move the cursor if the target is not focused
   if (target !== document.activeElement || start < 0 || (end && end < 0)) {
@@ -38,7 +11,8 @@ function setCursorPosition(target: HTMLElement, start: number, end: number | nul
   range.selectNodeContents(target);
 
   const startTreeItem = TreeUtils.getElementByIndex(target.tree, start);
-  const endTreeItem = end && startTreeItem && end < startTreeItem.start && end >= startTreeItem.start + startTreeItem.length ? TreeUtils.getElementByIndex(target.tree, end) : startTreeItem;
+  const endTreeItem =
+    end && startTreeItem && (end < startTreeItem.start || end >= startTreeItem.start + startTreeItem.length) ? TreeUtils.getElementByIndex(target.tree, end) : startTreeItem;
 
   if (!startTreeItem || !endTreeItem) {
     throw new Error('Invalid start or end tree item');
@@ -145,4 +119,4 @@ function scrollCursorIntoView(target: HTMLInputElement) {
   }
 }
 
-export {getCurrentCursorPosition, moveCursorToEnd, setCursorPosition, setPrevText, removeSelection, scrollCursorIntoView};
+export {getCurrentCursorPosition, moveCursorToEnd, setCursorPosition, removeSelection, scrollCursorIntoView};

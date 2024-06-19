@@ -355,7 +355,6 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
   }
 
   moveCursor(isFocused, alwaysMoveCursorToTheEnd, cursorPosition, target);
-  CursorUtils.setPrevText(target);
 
   return {text, cursorPosition: cursorPosition || 0, tree};
 }
