@@ -18,7 +18,7 @@ type TreeItem = Omit<MarkdownRange, 'type'> & {
 
 function addItemToTree(element: HTMLElement, parentTreeItem: TreeItem, type: ElementType) {
   const contentLength = element.nodeName === 'BR' ? 1 : element.innerText.length;
-  const isGeneratingNewline = type === 'line' && !(element.childNodes.length === 1 && element.childNodes[0]?.nodeName === 'BR');
+  const isGeneratingNewline = type === 'line' && !(element.childNodes.length === 1 && element.childNodes[0]?.getAttribute('data-type') === 'br');
   const parentChildrenCount = parentTreeItem?.children.length || 0;
   let startIndex = parentTreeItem.start;
   if (parentChildrenCount > 0) {
@@ -81,6 +81,7 @@ function buildTree(rootElement: HTMLElement, text: string) {
     });
   }
 
+  console.log('rootTreeItem', rootTreeItem);
   return rootTreeItem;
 }
 

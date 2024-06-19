@@ -24,7 +24,7 @@ function setCursorPosition(target: HTMLElement, start: number, end: number | nul
     range.setStart(startTreeItem.element.childNodes[0] as ChildNode, start - startTreeItem.start);
   }
 
-  if (startTreeItem.type === 'br') {
+  if (endTreeItem.type === 'br') {
     range.setEndBefore(endTreeItem.element);
   } else {
     range.setEnd(endTreeItem.element.childNodes[0] as ChildNode, (end || start) - endTreeItem.start);
@@ -78,10 +78,9 @@ function getCurrentCursorPosition(target: HTMLElement) {
   let start = -1;
   let end = -1;
   if (startTreeItem && endTreeItem) {
-    start = startTreeItem.start + range.startOffset;
-    end = endTreeItem.start + range.endOffset;
+    start = startTreeItem.start + (startTreeItem.type === 'br' ? 0 : range.startOffset);
+    end = endTreeItem.start + (endTreeItem.type === 'br' ? 0 : range.endOffset);
   }
-
   return {start, end};
 }
 

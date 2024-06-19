@@ -170,7 +170,10 @@ function addTextToElement(element: HTMLElement, text: string) {
     }
 
     if (index < lines.length - 1 || (index === 0 && line === '')) {
-      element.appendChild(document.createElement('br'));
+      const span = document.createElement('span');
+      span.appendChild(document.createElement('br'));
+      span.setAttribute('data-type', 'br');
+      element.appendChild(span);
     }
   });
 }
@@ -353,8 +356,6 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
       moveCursor(isFocused, alwaysMoveCursorToTheEnd, cursorPosition, target);
     }
   }
-
-  moveCursor(isFocused, alwaysMoveCursorToTheEnd, cursorPosition, target);
 
   return {text, cursorPosition: cursorPosition || 0, tree};
 }

@@ -259,14 +259,6 @@ const MarkdownTextInput = React.forwardRef<TextInput, MarkdownTextInputProps>(
       [parseText, processedMarkdownStyle],
     );
 
-    // We have to process value property since contentEditable div adds one additional '\n' at the end of the text if we are entering new line
-    const processedValue = useMemo(() => {
-      if (value && value[value.length - 1] === '\n') {
-        return `${value}\n`;
-      }
-      return value;
-    }, [value]);
-
     // Placeholder text color logic
     const updateTextColor = useCallback(
       (node: HTMLDivElement, text: string) => {
@@ -453,7 +445,7 @@ const MarkdownTextInput = React.forwardRef<TextInput, MarkdownTextInputProps>(
             //   We need to change normal behavior of "Enter" key to insert a line breaks, to prevent wrapping contentEditable text in <div> tags.
             //  Thanks to that in every situation we have proper amount of new lines in our parsed text. Without it pressing enter in empty lines will add 2 more new lines.
             document.execCommand('insertLineBreak');
-            CursorUtils.scrollCursorIntoView(divRef.current as HTMLInputElement);
+            // CursorUtils.scrollCursorIntoView(divRef.current as HTMLInputElement);
           }
 
           if (!e.shiftKey && ((shouldBlurOnSubmit && hostNode !== null) || !multiline)) {
@@ -567,7 +559,7 @@ const MarkdownTextInput = React.forwardRef<TextInput, MarkdownTextInputProps>(
 
     useClientEffect(
       function parseAndStyleValue() {
-        if (!divRef.current || processedValue === textContent.current) {
+        if (!divRef.current || value === textContent.current) {
           return;
         }
 
@@ -580,7 +572,7 @@ const MarkdownTextInput = React.forwardRef<TextInput, MarkdownTextInputProps>(
         parseText(divRef.current, value, processedMarkdownStyle);
         updateTextColor(divRef.current, value);
       },
-      [multiline, processedMarkdownStyle, processedValue],
+      [multiline, processedMarkdownStyle],
     );
 
     useClientEffect(
@@ -618,6 +610,7 @@ const MarkdownTextInput = React.forwardRef<TextInput, MarkdownTextInputProps>(
       const newSelection: Selection = {start: selection.start, end: selection.end ?? selection.start};
       contentSelection.current = newSelection;
       updateRefSelectionVariables(newSelection);
+      console.log('dupsko');
       CursorUtils.setCursorPosition(divRef.current, newSelection.start, newSelection.end);
     }, [selection, updateRefSelectionVariables]);
 
