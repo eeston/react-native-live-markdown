@@ -24,7 +24,8 @@ function addItemToTree(element: HTMLElement, parentTreeItem: TreeItem, type: Ele
     const lastParentChild = parentTreeItem.children[parentChildrenCount - 1];
     if (lastParentChild) {
       startIndex = lastParentChild.start + lastParentChild.length;
-      startIndex += lastParentChild.type === 'line' ? 1 : 0;
+      // we need to apply start index offset to line elements because of the display: block; style, that generates fake newline
+      startIndex += lastParentChild.type === 'line' && !(lastParentChild.element.childNodes.length === 1 && lastParentChild.element.childNodes[0]?.nodeName === 'BR') ? 1 : 0;
     }
   }
 
@@ -77,6 +78,7 @@ function buildTree(rootElement: HTMLElement, text: string) {
       stack.push(newTreeItem);
     });
   }
+
   return rootTreeItem;
 }
 
