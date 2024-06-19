@@ -81,6 +81,7 @@ function getCurrentCursorPosition(target: HTMLElement) {
     start = startTreeItem.start + (startTreeItem.type === 'br' ? 0 : range.startOffset);
     end = endTreeItem.start + (endTreeItem.type === 'br' ? 0 : range.endOffset);
   }
+
   return {start, end};
 }
 

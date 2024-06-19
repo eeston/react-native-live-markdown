@@ -160,6 +160,13 @@ function groupMarkdownRangesByLine(lines: Paragraph[], ranges: MarkdownRange[]) 
   });
 }
 
+function createBrElement() {
+  const span = document.createElement('span');
+  span.appendChild(document.createElement('br'));
+  span.setAttribute('data-type', 'br');
+  return span;
+}
+
 function addTextToElement(element: HTMLElement, text: string) {
   const lines = text.split('\n');
   lines.forEach((line, index) => {
@@ -170,10 +177,7 @@ function addTextToElement(element: HTMLElement, text: string) {
     }
 
     if (index < lines.length - 1 || (index === 0 && line === '')) {
-      const span = document.createElement('span');
-      span.appendChild(document.createElement('br'));
-      span.setAttribute('data-type', 'br');
-      element.appendChild(span);
+      element.appendChild(createBrElement());
     }
   });
 }
@@ -187,7 +191,7 @@ function createParagraph(text: string | null = null) {
   });
   p.setAttribute('data-type', 'line');
   if (text === '') {
-    p.appendChild(document.createElement('br'));
+    p.appendChild(createBrElement());
   } else if (text) {
     addTextToElement(p, text);
   }
@@ -325,7 +329,7 @@ function parseText(target: HTMLElement, text: string, curosrPositionIndex: numbe
   const isFocused = document.activeElement === target;
   if (isFocused && curosrPositionIndex === null) {
     const selection = CursorUtils.getCurrentCursorPosition(target);
-    cursorPosition = selection ? selection.end : null;
+    cursorPosition = selection ? selection.start : null;
   }
   const ranges = global.parseExpensiMarkToRanges(text);
   const markdownRanges: MarkdownRange[] = ranges as MarkdownRange[];
