@@ -13,19 +13,19 @@ type TreeItem = Omit<MarkdownRange, 'type'> & {
   relativeStart: number;
   type: ElementType;
   orderIndex: string;
+  isGeneratingNewline: boolean;
 };
 
 function addItemToTree(element: HTMLElement, parentTreeItem: TreeItem, type: ElementType) {
   const contentLength = element.nodeName === 'BR' ? 1 : element.innerText.length;
+  const isGeneratingNewline = type === 'line' && !(element.childNodes.length === 1 && element.childNodes[0]?.nodeName === 'BR');
   const parentChildrenCount = parentTreeItem?.children.length || 0;
-
   let startIndex = parentTreeItem.start;
   if (parentChildrenCount > 0) {
     const lastParentChild = parentTreeItem.children[parentChildrenCount - 1];
     if (lastParentChild) {
       startIndex = lastParentChild.start + lastParentChild.length;
-      // we need to apply start index offset to line elements because of the display: block; style, that generates fake newline
-      startIndex += lastParentChild.type === 'line' && !(lastParentChild.element.childNodes.length === 1 && lastParentChild.element.childNodes[0]?.nodeName === 'BR') ? 1 : 0;
+      startIndex += lastParentChild.isGeneratingNewline ? 1 : 0;
     }
   }
 
@@ -38,6 +38,7 @@ function addItemToTree(element: HTMLElement, parentTreeItem: TreeItem, type: Ele
     length: contentLength,
     type,
     orderIndex: parentTreeItem.parent === null ? `${parentChildrenCount}` : `${parentTreeItem.orderIndex},${parentChildrenCount}`,
+    isGeneratingNewline,
   };
 
   element.setAttribute('data-id', item.orderIndex);
@@ -65,6 +66,7 @@ function buildTree(rootElement: HTMLElement, text: string) {
     length: text.replace(/\n/g, '\\n').length,
     type: 'text',
     orderIndex: '',
+    isGeneratingNewline: false,
   };
   const stack = [rootTreeItem];
   while (stack.length > 0) {
@@ -107,6 +109,7 @@ function getElementByIndex(treeRoot: TreeItem, index: number) {
   let el: TreeItem | null = treeRoot;
 
   let i = 0;
+  let newLineGenerated = false;
   while (el && el.children.length > 0 && i < el.children.length) {
     const child = el.children[i] as TreeItem;
 
@@ -114,12 +117,19 @@ function getElementByIndex(treeRoot: TreeItem, index: number) {
       break;
     }
 
-    if (index >= child.start && index <= child.start + child.length) {
+    if (index >= child.start && index < child.start + child.length) {
       if (child.children.length === 0) {
         return child;
       }
       el = child;
       i = 0;
+    } else if ((child.isGeneratingNewline || newLineGenerated) && index === child.start + child.length) {
+      newLineGenerated = true;
+      if (child.children.length === 0) {
+        return child;
+      }
+      el = child;
+      i = el.children.length - 1;
     } else {
       i++;
     }
